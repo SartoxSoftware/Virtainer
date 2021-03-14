@@ -11,17 +11,17 @@ Originally, I've made **MyFastEmulator**, which was a fork of the **quickemu** p
 - **And more!**
 
 # Files
-run.sh : The classic script, run any type of VM. (Linux, Windows and macOS)<br/>
-live-linux.sh : Create a Linux VM quickly for Live purposes only with a single command, both config and disk are deleted after shutdown.<br/>
-quick-linux.sh : Create a Linux VM quickly with a single command, both config and disk are kept after shutdown.<br/>
-config-creator.sh : Create a config of any type. (Linux, Windows and macOS)
+**run.sh**            : The classic script, run any type of VM. (Linux, Windows and macOS)<br/>
+**live-linux.sh**     : Create a Linux VM quickly for Live purposes only with a single command, both config and disk are deleted after shutdown.<br/>
+**quick-linux.sh**    : Create a Linux VM quickly with a single command, both config and disk are kept after shutdown.<br/>
+**config-creator.sh** : Create a config of any type. (Linux, Windows and macOS)
 
 # Download
-``git clone https://github.com/NanoSoftwares/Virtainer.git``
+``git clone https://github.com/NanoSoftwares/Virtainer.git``<br/>
 ``cd Virtainer``
 
 # Usage
-``./config-creator.sh``
+``./config-creator.sh``<br/>
 ``./run.sh -vm <config>.conf``
 
 # Create a quick Live Linux config
