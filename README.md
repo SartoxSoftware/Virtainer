@@ -11,9 +11,9 @@ Originally, I've made **MyFastEmulator**, which was a fork of the **quickemu** p
 - **And more!**
 
 # Files
-run.sh : The classic script, run any type of VM. (Linux, Windows and macOS)
-live-linux.sh : Create a Linux VM quickly for Live purposes only with a single command, both config and disk are deleted after shutdown.
-quick-linux.sh : Create a Linux VM quickly with a single command, both config and disk are kept after shutdown.
+run.sh : The classic script, run any type of VM. (Linux, Windows and macOS)<br/>
+live-linux.sh : Create a Linux VM quickly for Live purposes only with a single command, both config and disk are deleted after shutdown.<br/>
+quick-linux.sh : Create a Linux VM quickly with a single command, both config and disk are kept after shutdown.<br/>
 config-creator.sh : Create a config of any type. (Linux, Windows and macOS)
 
 # Download
