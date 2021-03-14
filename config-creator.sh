@@ -41,8 +41,8 @@ function start()
 	echo "What should be the type of BIOS of the guest? (options : efi/legacy, default : efi)"
 	read bios
 
-	echo "How much video memory in megabytes should the guest have? (default : 128)"
-	read video_memory
+	echo "Would you like to not save anything to the virtual disk? (options : on/off, default : off)"
+	read snapshot
 
 	file="${name}.conf"
 
@@ -57,7 +57,7 @@ function start()
 	addOptionSafe ${file} "nested_virtualization" ${nested_virtualization}
 	addOptionSafe ${file} "optimize_system" ${optimize_system}
 	addOptionSafe ${file} "bios" ${bios}
-	addOptionSafe ${file} "video_memory" ${video_memory}
+	addOptionSafe ${file} "snapshot" ${snapshot}
 }
 
 function addOptionSafe()

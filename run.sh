@@ -85,13 +85,18 @@ function startVM()
 		disk_size="40G"
 	fi
 
+	if [ -z ${snapshot} ]; then
+		snapshot="off"
+	fi
+
 	if [ ${optimize_system} == "linux" ]; then
 		vmSystemGraphics="virtio-vga,virgl=${accelerated_graphics}"
-		vmSystemExtra="-object rng-random,id=rng0,filename=/dev/urandom -device virtio-rng-pci,rng=rng0"
+		vmSystemExtra="-device virtio-rng-pci,rng=rng0 -object rng-random,id=rng0,filename=/dev/urandom"
 	elif [ ${optimize_system} == "windows" ]; then
 		vmSystemGraphics="qxl-vga,vgamem_mb=256"
-		vmSystemExtra="-no-hpet"
+		vmSystemExtra="-no-hpet -chardev spiceport,name=org.spice-space.stream.0,id=spicechannel2 -device virtserialport,bus=virtio-serial-bus.0,nr=21,chardev=spicechannel2,name=org.spice-space.stream.0 -chardev spiceport,name=org.spice-space.webdav.0,id=spicechannel3 -device virtserialport,bus=virtio-serial-bus.0,nr=24,chardev=spicechannel3,name=org.spice-space.webdav.0"
 		vmCpuTweaks=",hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time"
+		vmUsb="usb-ehci"
 
 		display="spice-app"
 	elif [ ${optimize_system} == "macos" ]; then
@@ -135,6 +140,10 @@ function startVM()
 			rm -r -f "$PWD/macOS/BaseSystem"
 			echo ""
 		fi
+	fi
+
+	if [ ${snapshot} == "on" ]; then
+		vmSystemExtra="${vmSystemExtra} -snapshot"
 	fi
 
 	if [ ${nested_virtualization} == "on" ]; then
@@ -226,7 +235,7 @@ function startVM()
     	${vmSystemExtra} ${vmSystemDrives} \
 		-drive if=none,id=drive0,cache=directsync,aio=native,format=qcow2,file="${vmDisk}" \
 		-device virtio-blk-pci,drive=drive0,scsi=off \
-    	"${@}"
+		"${@}"
 }
 
 function usage()
