@@ -35,7 +35,7 @@ function start()
 	echo "Should nested virtualization be enabled in the guest? (options : on/off, default : off)"
 	read nested_virtualization
 
-	echo "For what operating system should the guest be optimized for? (options : windows/linux/macos, default : linux)"
+	echo "For what operating system should the guest be optimized for? (options : windows(7/10)/linux/macos/legacy, default : linux)"
 	read optimize_system
 
 	echo "What should be the type of BIOS of the guest? (options : efi/legacy, default : efi)"
@@ -43,6 +43,9 @@ function start()
 
 	echo "Would you like to not save anything to the virtual disk? (options : on/off, default : off)"
 	read snapshot
+
+	echo "Would you like to force adding the ISO images (main ISO + driver ISO, if any) even if the OS is installed? (options : on/off, default : off)"
+	read force_add_iso_images
 
 	file="${name}.conf"
 
@@ -58,6 +61,7 @@ function start()
 	addOptionSafe ${file} "optimize_system" ${optimize_system}
 	addOptionSafe ${file} "bios" ${bios}
 	addOptionSafe ${file} "snapshot" ${snapshot}
+	addOptionSafe ${file} "force_add_iso_images" ${force_add_iso_images}
 }
 
 function addOptionSafe()
