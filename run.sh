@@ -31,6 +31,55 @@ vmAudio="-audiodev pa,id=snd0 -device ich9-intel-hda -device hda-output,audiodev
 
 cpuInfo=$(cat /proc/cpuinfo | grep Intel)
 
+usbPassthrough=""
+usbDevices=""
+
+function enableUSBPassthrough()
+{
+	device=""
+	usbBus=""
+	usbDev=""
+	usbName=""
+	vendorId=""
+	productId=""
+	tempScript=$(mktemp)
+	execScript=0
+
+	if (( ${#usb_devices[@]} )); then
+		echo "#!/bin/bash" > "${tempScript}"
+
+		for device in "${usb_devices[@]}"; do
+			vendorId=$(echo ${device} | cut -d':' -f1)
+			productId=$(echo ${device} | cut -d':' -f2)
+
+			usbBus=$(lsusb -d ${vendorId}:${productId} | cut -d' ' -f2)
+			usbDev=$(lsusb -d ${vendorId}:${productId} | cut -d' ' -f4 | cut -d':' -f1)
+			usbName=$(lsusb -d ${vendorId}:${productId} | cut -d' ' -f7-)
+
+			usbDevices="${usbDevices} ${usbName}"
+			usbPassthrough="${usbPassthrough} -device usb-host,vendorid=0x${vendorId},productid=0x${productId},bus=usb.0"
+
+			if [ ! -w /dev/bus/usb/${usbBus}/${usbDev} ]; then
+        		execScript=1
+        		echo "chown root:${USER} /dev/bus/usb/${usbBus}/${usbDev}" >> "${tempScript}"
+      		fi
+
+      		if [ ${execScript} -eq 1 ]; then
+      			chmod +x "${tempScript}"
+			    sudo "${tempScript}"
+			    
+			    if [ $? -ne 0 ]; then
+			    	usbDevices="Requested USB devices are not accessible."
+			    fi
+		    fi
+
+    		rm -f "${tempScript}"
+		done
+	else
+		usbDevices="None"
+	fi
+}
+
 function startVM()
 {
 	echo "QEMU v${qemuVer} - QEMU Script v${qemuScriptVer} - Adapted for QEMU v5.2.0"
@@ -94,6 +143,10 @@ function startVM()
 
 	if [ -z ${force_add_iso_images} ]; then
 		force_add_iso_images="off"
+	fi
+
+	if [ -z ${usb_devices} ]; then
+		usb_devices=()
 	fi
 
 	if [ ${optimize_system} == "linux" ]; then
@@ -182,10 +235,12 @@ function startVM()
 		setupDisk
 	else
 		diskSize=$(stat -c%s "${vmDisk}")
-		if [ ${diskSize} -le 1581056 ] || [ ${force_add_iso_images} == "on" ]; then
+		if [ ${diskSize} -le $((197632 * 8)) ] || [ ${force_add_iso_images} == "on" ]; then
 			setupDisk
 		fi
 	fi
+
+	enableUSBPassthrough
 
 	echo "RAM                   : ${ram}"
 	echo "Cores                 : ${cores}"
@@ -196,6 +251,7 @@ function startVM()
 	echo "Display               : ${display}"
 	echo "BIOS                  : ${bios^}"
 	echo "Nested virtualization : ${nested_virtualization^^}"
+	echo "USB passthrough       : ${usbDevices}"
 	echo ""
 	echo "Starting..."
 	echo ""
@@ -208,7 +264,7 @@ function startVM()
 		-m ${ram} -device virtio-balloon-pci \
 		-device ${vmSystemGraphics} \
 		-display ${display},gl=${accelerated_graphics} \
-		-device ${vmUsb},id=usb -device usb-kbd,bus=usb.0 -device usb-tablet,bus=usb.0 \
+		-device ${vmUsb},id=usb -device usb-kbd,bus=usb.0 -device usb-tablet,bus=usb.0 ${usbPassthrough} \
 		-netdev user,hostname="${vmName}",id=nic -device ${vmNetwork},netdev=nic \
 		${vmAudio} \
       	-rtc base=localtime,clock=host \

@@ -47,6 +47,9 @@ function start()
 	echo "Would you like to force adding the ISO images (main ISO + driver ISO, if any) even if the OS is installed? (options : on/off, default : off)"
 	read force_add_iso_images
 
+	echo "Would you like to passthrough any USB device? (syntax : ('vendorid:productid', 'vendorid2:productid2', ..), default : ())"
+	read usb_devices
+
 	file="${name}.conf"
 
 	addOptionSafe ${file} "iso" ${iso}
@@ -62,6 +65,7 @@ function start()
 	addOptionSafe ${file} "bios" ${bios}
 	addOptionSafe ${file} "snapshot" ${snapshot}
 	addOptionSafe ${file} "force_add_iso_images" ${force_add_iso_images}
+	addOptionSafe ${file} "usb_devices" ${usb_devices}
 }
 
 function addOptionSafe()
