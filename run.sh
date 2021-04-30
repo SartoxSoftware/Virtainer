@@ -28,6 +28,7 @@ vmCpuTweaks=""
 vmDiskDrive="-device virtio-blk-pci,drive=drive0,scsi=off"
 vmMachine="q35"
 vmAudio="-audiodev pa,id=snd0 -device ich9-intel-hda -device hda-output,audiodev=snd0"
+vmPeripherals="-device usb-kbd,bus=usb.0 -device usb-tablet,bus=usb.0"
 
 cpuInfo=$(cat /proc/cpuinfo | grep Intel)
 
@@ -82,7 +83,7 @@ function enableUSBPassthrough()
 
 function startVM()
 {
-	echo "QEMU v${qemuVer} - QEMU Script v${qemuScriptVer} - Adapted for QEMU v5.2.0"
+	echo "QEMU v${qemuVer} - QEMU Script v${qemuScriptVer} - Adapted for QEMU v6.0.0"
 	echo ""
 
 	source "${vmFile}"
@@ -92,7 +93,7 @@ function startVM()
 	fi
 	vmDisk="$PWD/VMs/${vmName}.qcow2"
 
-	if [ ${XDG_SESSION_TYPE} == "x11" ]; then
+	if [ "${XDG_SESSION_TYPE}" == "x11" ]; then
 		vmWidth=$(xrandr --listmonitors | grep -v Monitors | cut -d' ' -f4 | cut -d'/' -f1 | sort | head -n1)
 		vmHeight=$(xrandr --listmonitors | grep -v Monitors | cut -d' ' -f4 | cut -d'/' -f2 | cut -d'x' -f2 | sort | head -n1)
 	fi
@@ -171,6 +172,8 @@ function startVM()
 		vmSystemExtra="-no-hpet"
 
 		vmUsb="piix4-usb-uhci"
+		vmPeripherals=""
+		
 		vmDiskDrive="-device ide-hd,drive=drive0"
 
 		vmMachine="pc"
@@ -227,7 +230,7 @@ function startVM()
 	fi
 
 	if [ ${bios} == "efi" ]; then
-		vmSystemExtra="${vmSystemExtra} -drive if=pflash,format=raw,readonly,file=/usr/share/OVMF/x64/OVMF_CODE.fd -drive if=pflash,format=raw,readonly,file=/usr/share/OVMF/x64/OVMF_VARS.fd"
+		vmSystemExtra="${vmSystemExtra} -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/x64/OVMF_CODE.fd -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/x64/OVMF_VARS.fd"
 	fi
 
 	if [ ! -f "${vmDisk}" ]; then
@@ -264,14 +267,14 @@ function startVM()
 		-m ${ram} -device virtio-balloon-pci \
 		-device ${vmSystemGraphics} \
 		-display ${display},gl=${accelerated_graphics} \
-		-device ${vmUsb},id=usb -device usb-kbd,bus=usb.0 -device usb-tablet,bus=usb.0 ${usbPassthrough} \
+		-device ${vmUsb},id=usb ${vmPeripherals} ${usbPassthrough} \
 		-netdev user,hostname="${vmName}",id=nic -device ${vmNetwork},netdev=nic \
 		${vmAudio} \
       	-rtc base=localtime,clock=host \
       	-device virtio-serial-pci \
       	-chardev spicevmc,id=spicechannel0,name=vdagent \
       	-device virtserialport,chardev=spicechannel0,name=com.redhat.spice.0 \
-      	-chardev socket,path=/tmp/qga.sock,server,nowait,id=spicechannel1 \
+      	-chardev socket,path=/tmp/qga.sock,server=on,wait=off,id=spicechannel1 \
     	-device virtserialport,chardev=spicechannel1,name=org.qemu.guest_agent.0 \
     	${vmSystemExtra} ${vmSystemDrives} \
 		-drive if=none,id=drive0,cache=directsync,aio=native,format=qcow2,file="${vmDisk}" \
@@ -281,10 +284,10 @@ function startVM()
 
 function setupDisk()
 {
-	if [ ${optimize_system} != "macos" ]; then
-		vmSystemDrives="-drive media=cdrom,index=0,file=${iso}"
-	else
+	if [ ${optimize_system} == "macos" ]; then
 		vmSystemExtra="${vmSystemExtra} -drive id=drive2,if=none,cache=directsync,aio=native,format=dmg,file=$PWD/macOS/BaseSystem/BaseSystem.dmg -device virtio-blk-pci,drive=drive2,scsi=off"
+	else
+		vmSystemDrives="-drive media=cdrom,index=0,file=${iso}"
 	fi
 
 	if [ ${optimize_system} == "windows7" ] || [ ${optimize_system} == "windows10" ]; then
