@@ -27,8 +27,5 @@ Virtainer, since the April 2021 Update 1, supports Windows 7 and legacy operatin
 ``./config-creator.sh``<br/>
 ``./run.sh -vm <config>.conf``
 
-# Create a quick Live Linux config
-``./live-linux.sh <iso>``
-
-# Create a quick Linux config
-``./quick-linux.sh <iso>``
+# Create a quick (live) Linux config
+``./quick-linux.sh <iso> <snapshot>``
