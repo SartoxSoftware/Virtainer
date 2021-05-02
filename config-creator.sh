@@ -9,7 +9,6 @@ function start()
 
 	echo "Drag & drop the boot ISO :"
 	read iso
-	iso=$(echo $iso | cut -d "'" -f 2)
 
 	echo "How much disk space should the guest have? (format : <number><G,M,K>, default : 40G)"
 	read disk_size
@@ -52,20 +51,20 @@ function start()
 
 	file="${name}.conf"
 
-	addOptionSafe ${file} "iso" ${iso}
-	addOptionSafe ${file} "disk_size" ${disk_size}
-	addOptionSafe ${file} "ram" ${ram}
-	addOptionSafe ${file} "cores" ${cores}
-	addOptionSafe ${file} "threads" ${threads}
-	addOptionSafe ${file} "display" ${display}
-	addOptionSafe ${file} "accelerated_graphics" ${accelerated_graphics}
-	addOptionSafe ${file} "cpu" ${cpu}
-	addOptionSafe ${file} "nested_virtualization" ${nested_virtualization}
-	addOptionSafe ${file} "optimize_system" ${optimize_system}
-	addOptionSafe ${file} "bios" ${bios}
-	addOptionSafe ${file} "snapshot" ${snapshot}
-	addOptionSafe ${file} "force_add_iso_images" ${force_add_iso_images}
-	addOptionSafe ${file} "usb_devices" ${usb_devices}
+	addOptionSafe "${file}" "iso" "${iso}"
+	addOptionSafe "${file}" "disk_size" ${disk_size}
+	addOptionSafe "${file}" "ram" ${ram}
+	addOptionSafe "${file}" "cores" ${cores}
+	addOptionSafe "${file}" "threads" ${threads}
+	addOptionSafe "${file}" "display" ${display}
+	addOptionSafe "${file}" "accelerated_graphics" ${accelerated_graphics}
+	addOptionSafe "${file}" "cpu" ${cpu}
+	addOptionSafe "${file}" "nested_virtualization" ${nested_virtualization}
+	addOptionSafe "${file}" "optimize_system" ${optimize_system}
+	addOptionSafe "${file}" "bios" ${bios}
+	addOptionSafe "${file}" "snapshot" ${snapshot}
+	addOptionSafe "${file}" "force_add_iso_images" ${force_add_iso_images}
+	addOptionSafe "${file}" "usb_devices" ${usb_devices}
 }
 
 function addOptionSafe()
@@ -75,7 +74,7 @@ function addOptionSafe()
 	value="$3"
 
 	if [ ! -z "${value}" -a "${value}" != " " ]; then
-		echo "${option}=${value}" >> ${file}
+		echo "${option}=${value}" >> "${file}"
 	fi
 }
 

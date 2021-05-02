@@ -260,7 +260,7 @@ function startVM()
 	echo ""
 
 	${qemu} \
-		-name ${vmFile},process=${vmFile}  \
+		-name "${vmFile}",process="${vmFile}"  \
 		-enable-kvm -machine ${vmMachine},vmport=off,nvdimm=on \
 		-smbios type=2 \
 		-cpu ${cpu},kvm=on${vmCpuTweaks} -smp sockets=1,cores=${cores},threads=${threads} \
