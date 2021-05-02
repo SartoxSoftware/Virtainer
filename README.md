@@ -15,9 +15,9 @@ Virtainer, since the April 2021 Update 1, supports Windows 7 and legacy operatin
 
 # Files
 **run.sh**            : The classic script, run any type of VM. (Linux, Windows and macOS)<br/>
-**live-linux.sh**     : Create a Linux VM quickly for Live purposes only with a single command, both config and disk are deleted after shutdown.<br/>
-**quick-linux.sh**    : Create a Linux VM quickly with a single command, both config and disk are kept after shutdown.<br/>
-**config-creator.sh** : Create a config of any type. (Linux, Windows and macOS)
+**quick-linux.sh**    : Create a Linux VM quickly with a single command, both config and disk can be either kept or deleted after shutdown.<br/>
+**config-creator.sh** : Create a config of any type. (Linux, Windows and macOS)<br/>
+**quick-setup.sh**    : Simple script to quickly setup a Linux VM within a few minutes (or hours depending on the speed of your internet connection).
 
 # Download
 ``git clone https://github.com/NanoSoftwares/Virtainer.git``<br/>
@@ -28,4 +28,4 @@ Virtainer, since the April 2021 Update 1, supports Windows 7 and legacy operatin
 ``./run.sh -vm <config>.conf``
 
 # Create a quick (live) Linux config
-``./quick-linux.sh <iso> <snapshot>``
+``./quick-linux.sh <iso> <snapshot (on/off)>``
