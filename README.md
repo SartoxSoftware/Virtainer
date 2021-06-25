@@ -10,8 +10,8 @@ Originally, I've made **MyFastEmulator**, which was a fork of the **quickemu** p
 - **Very fast** and **easy to use**
 - **And more!**
 
-# NOTE about Windows 7 and legacy operating systems
-Virtainer, since the April 2021 Update 1, supports Windows 7 and legacy operating systems. However, especially the Legacy optimize system option, **isn't tuned for maximum performance**. If you really want to have maximum performance in a Legacy operating system, please make a new optimize system option for your legacy operating system of choice in Virtainer's source code. For Windows 7 guests, support is limited (especially for the guest tools), like it uses a SATA drive instead of a VirtIO drive (which does waste quite some I/O performance).
+# NOTE about legacy operating systems
+Virtainer, since the April 2021 Update 1, supports ~~Windows 7 and~~ legacy operating systems. However, this option **isn't tuned for maximum performance**. If you really want to have maximum performance in a legacy OS, please make a new optimize system option for your legacy OS of choice in Virtainer's source code.
 
 # Files
 **run.sh**            : The classic script, run any type of VM. (Linux, Windows and macOS)<br/>
@@ -27,5 +27,8 @@ Virtainer, since the April 2021 Update 1, supports Windows 7 and legacy operatin
 ``./config-creator.sh``<br/>
 ``./run.sh -vm <config>.conf``
 
-# Create a quick (live) Linux config
+# Quickly creating a (live) Linux config
 ``./quick-linux.sh <iso> <snapshot (on/off)>``
+
+# Quickly setting up a Linux VM
+``./quick-setup.sh``
