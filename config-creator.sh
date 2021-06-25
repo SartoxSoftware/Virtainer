@@ -34,7 +34,7 @@ function start()
 	echo "Should nested virtualization be enabled in the guest? (options : on/off, default : off)"
 	read nested_virtualization
 
-	echo "For what operating system should the guest be optimized for? (options : windows(7/10)/linux/macos/legacy, default : linux)"
+	echo "For what operating system should the guest be optimized for? (options : linux/windows/macos/legacy, default : linux)"
 	read optimize_system
 
 	echo "What should be the type of BIOS of the guest? (options : efi/legacy, default : efi)"

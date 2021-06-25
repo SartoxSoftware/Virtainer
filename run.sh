@@ -153,18 +153,12 @@ function startVM()
 	if [ ${optimize_system} == "linux" ]; then
 		vmSystemGraphics="virtio-vga,virgl=${accelerated_graphics},xres=${vmWidth},yres=${vmHeight}"
 		vmSystemExtra="-device virtio-rng-pci,rng=rng0 -object rng-random,id=rng0,filename=/dev/urandom"
-	elif [ ${optimize_system} == "windows10" ]; then
-		vmSystemGraphics="qxl-vga,vgamem_mb=256"
-		vmCpuTweaks=",hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time"
-		vmSystemExtra="-no-hpet -chardev spiceport,name=org.spice-space.stream.0,id=spicechannel2 -device virtserialport,bus=virtio-serial-bus.0,nr=21,chardev=spicechannel2,name=org.spice-space.stream.0 -chardev spiceport,name=org.spice-space.webdav.0,id=spicechannel3 -device virtserialport,bus=virtio-serial-bus.0,nr=24,chardev=spicechannel3,name=org.spice-space.webdav.0"
-			
-		display="spice-app"
-	elif [ ${optimize_system} == "windows7" ]; then
+	elif [ ${optimize_system} == "windows" ]; then
 		vmSystemGraphics="qxl-vga,vgamem_mb=256,xres=${vmWidth},yres=${vmHeight}"
-		vmSystemExtra="-no-hpet -chardev spiceport,name=org.spice-space.stream.0,id=spicechannel2 -device virtserialport,bus=virtio-serial-bus.0,nr=21,chardev=spicechannel2,name=org.spice-space.stream.0 -chardev spiceport,name=org.spice-space.webdav.0,id=spicechannel3 -device virtserialport,bus=virtio-serial-bus.0,nr=24,chardev=spicechannel3,name=org.spice-space.webdav.0"
 		vmCpuTweaks=",hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time"
-		vmUsb="usb-ehci"
-		vmDiskDrive="-device ahci,id=ahci -device ide-hd,drive=drive0,bus=ahci.0"
+		vmSystemExtra="-no-hpet -chardev spiceport,name=org.spice-space.stream.0,id=spicechannel2 -device virtserialport,bus=virtio-serial-bus.0,nr=21,chardev=spicechannel2,name=org.spice-space.stream.0 -chardev spiceport,name=org.spice-space.webdav.0,id=spicechannel3 -device virtserialport,bus=virtio-serial-bus.0,nr=24,chardev=spicechannel3,name=org.spice-space.webdav.0"
+		#vmUsb="usb-ehci"
+		#vmDiskDrive="-device ahci,id=ahci -device ide-hd,drive=drive0,bus=ahci.0"
 
 		display="spice-app"
 	elif [ ${optimize_system} == "legacy" ]; then
@@ -180,6 +174,7 @@ function startVM()
 		vmNetwork="pcnet"
 
 		vmAudio="-device AC97"
+
 		bios="legacy"
 	elif [ ${optimize_system} == "macos" ]; then
 		vmCpuTweaks=",vendor=GenuineIntel,+kvm_pv_unhalt,+kvm_pv_eoi,+hypervisor,+invtsc"
@@ -190,7 +185,7 @@ function startVM()
 		fi
 
 		vmSystemExtra="-device isa-applesmc,osk=ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc -drive id=drive1,if=none,cache=directsync,aio=native,format=raw,file=$PWD/macOS/OpenCore.iso -device virtio-blk-pci,drive=drive1,scsi=off"
-		vmSystemGraphics="VGA,vgamem_mb=256,xres=${vmWidth},yres=${vmHeight}"
+		vmSystemGraphics="vmware-svga,vgamem_mb=256"
 		vmUsb="usb-ehci"
 		vmNetwork="vmxnet3,mac=52:54:00:c9:18:27"
 
@@ -199,21 +194,23 @@ function startVM()
 		fi
 
 		if [ ! -f "$PWD/macOS/OpenCore.iso" ]; then
-			wget "https://github.com/thenickdude/KVM-Opencore/releases/download/v10/OpenCore-v10.iso.gz" -O "$PWD/macOS/OpenCore.iso.gz"
+			wget "https://github.com/thenickdude/KVM-Opencore/releases/download/v13/OpenCore-v13.iso.gz" -O "$PWD/macOS/OpenCore.iso.gz"
 			gzip -d -f "$PWD/macOS/OpenCore.iso.gz"
 
 			echo ""
 		fi
 
 		if [ ! -f "$PWD/macOS/BaseSystem/BaseSystem.dmg" ]; then
+			mkdir "$PWD/macOS/BaseSystem"
+
 			if [ ! -f "$PWD/macOS/fetch.py" ]; then
-				wget "https://github.com/foxlet/macOS-Simple-KVM/raw/master/tools/FetchMacOS/fetch-macos.py" -O "$PWD/macOS/fetch.py"
+				wget "https://raw.githubusercontent.com/kholia/OSX-KVM/master/fetch-macOS-v2.py" -O "$PWD/macOS/fetch.py"
 
 				${pip} install requests
 				${pip} install click
 			fi
 
-			${python} "$PWD/macOS/fetch.py" -o "$PWD/macOS/BaseSystem/"
+			${python} "$PWD/macOS/fetch.py" --action download --outdir "$PWD/macOS/BaseSystem" --os-type latest
 			echo ""
 		fi
 	fi
@@ -247,6 +244,7 @@ function startVM()
 
 	echo "RAM                   : ${ram}"
 	echo "Cores                 : ${cores}"
+	echo "Threads               : ${threads}"
 	echo "CPU                   : ${cpu^}"
 	echo "Accelerated Graphics  : ${accelerated_graphics^^}"
 	echo "Resolution            : ${vmWidth}x${vmHeight}"
@@ -255,6 +253,9 @@ function startVM()
 	echo "BIOS                  : ${bios^}"
 	echo "Nested virtualization : ${nested_virtualization^^}"
 	echo "USB passthrough       : ${usbDevices}"
+	echo "Force adding ISO imgs : ${force_add_iso_images^^}"
+	echo "Disk size             : ${disk_size^^}"
+	echo "Snapshot              : ${snapshot^^}"
 	echo ""
 	echo "Starting..."
 	echo ""
@@ -290,7 +291,7 @@ function setupDisk()
 		vmSystemDrives="-drive media=cdrom,index=0,file=${iso}"
 	fi
 
-	if [ ${optimize_system} == "windows7" ] || [ ${optimize_system} == "windows10" ]; then
+	if [ ${optimize_system} == "windows" ]; then
 		if [ ! -e "$PWD/Windows" ]; then
 			mkdir "$PWD/Windows"
 		fi
@@ -314,15 +315,7 @@ function usage()
 
 function downloadGuestTools()
 {
-	if [ ${optimize_system} == "windows10" ]; then
-		wget "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/latest-virtio/virtio-win.iso" -O "$PWD/Windows/virtio-win.iso"
-	elif [ ${optimize_system} == "windows7" ]; then
-		mkdir "$PWD/Windows/tools"
-		wget "https://www.spice-space.org/download/windows/spice-guest-tools/spice-guest-tools-latest.exe" -O "$PWD/Windows/tools/guest_tools.exe"
-		mkisofs -o "$PWD/Windows/virtio-win.iso" "$PWD/Windows/tools"
-		rm -r -f "$PWD/Windows/tools"
-	fi
-
+	wget "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/latest-virtio/virtio-win.iso" -O "$PWD/Windows/virtio-win.iso"
 	echo ""
 }
 
