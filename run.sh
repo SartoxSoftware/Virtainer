@@ -1,117 +1,51 @@
-#!/bin/bash
+#!/usr/bin/env bash
 export LC_ALL=C
 
-qemu=$(which qemu-system-x86_64)
-qemuImg=$(which qemu-img)
-qemuVer=$(${qemu} -version | head -n1 | cut -d' ' -f4 | cut -d'(' -f1)
-qemuScriptVer="0.1"
-
-pip=$(which pip3)
-python=$(which python3)
-
+version="2.0.0"
 launcher=""
-
-vmFile=""
-vmName=""
-vmDisk=""
-
-vmWidth=800
-vmHeight=600
-
-vmSystemGraphics=""
-vmSystemExtra=""
-vmDriverIso=""
-vmSystemDrives=""
-vmUsb="qemu-xhci,p2=8,p3=8"
-vmNetwork="virtio-net-pci"
-vmCpuTweaks=""
-vmDiskDrive="-device virtio-blk-pci,drive=drive0,scsi=off"
-vmMachine="q35"
-vmAudio="-audiodev pa,id=snd0 -device ich9-intel-hda -device hda-output,audiodev=snd0"
-vmPeripherals="-device usb-kbd,bus=usb.0 -device usb-tablet,bus=usb.0"
-
+name=""
+disk=""
+ovmfCode="/usr/share/OVMF/OVMF_CODE.fd"
+ovmfVars="/usr/share/OVMF/OVMF_VARS.fd"
+diskDir="$PWD/VMs"
+winDir="$PWD/Windows"
+macDir="$PWD/macOS"
+openCoreVersion="16"
+drives=""
+machine="q35"
+extra=""
+audio="-audiodev pa,id=snd0 -device ich9-intel-hda -device hda-output,audiodev=snd0"
+cpuTweaks=""
+graphics="virtio-vga-gl"
+peripherals="-device virtio-keyboard-pci -device virtio-tablet-pci"
+usb="qemu-xhci,p2=8,p3=8"
+network="virtio-net-pci"
+diskInterface="-device virtio-blk-pci,drive=drive0,scsi=off"
 cpuInfo=$(cat /proc/cpuinfo | grep Intel)
 
-usbPassthrough=""
-usbDevices=""
-
-function enableUSBPassthrough()
+function usage()
 {
-	device=""
-	usbBus=""
-	usbDev=""
-	usbName=""
-	vendorId=""
-	productId=""
-	tempScript=$(mktemp)
-	execScript=0
-
-	if (( ${#usb_devices[@]} )); then
-		echo "#!/bin/bash" > "${tempScript}"
-
-		for device in "${usb_devices[@]}"; do
-			vendorId=$(echo ${device} | cut -d':' -f1)
-			productId=$(echo ${device} | cut -d':' -f2)
-
-			usbBus=$(lsusb -d ${vendorId}:${productId} | cut -d' ' -f2)
-			usbDev=$(lsusb -d ${vendorId}:${productId} | cut -d' ' -f4 | cut -d':' -f1)
-			usbName=$(lsusb -d ${vendorId}:${productId} | cut -d' ' -f7-)
-
-			usbDevices="${usbDevices} ${usbName}"
-			usbPassthrough="${usbPassthrough} -device usb-host,vendorid=0x${vendorId},productid=0x${productId},bus=usb.0"
-
-			if [ ! -w /dev/bus/usb/${usbBus}/${usbDev} ]; then
-        		execScript=1
-        		echo "chown root:${USER} /dev/bus/usb/${usbBus}/${usbDev}" >> "${tempScript}"
-      		fi
-
-      		if [ ${execScript} -eq 1 ]; then
-      			chmod +x "${tempScript}"
-			    sudo "${tempScript}"
-			    
-			    if [ $? -ne 0 ]; then
-			    	usbDevices="Requested USB devices are not accessible."
-			    fi
-		    fi
-
-    		rm -f "${tempScript}"
-		done
-	else
-		usbDevices="None"
-	fi
+	echo "Virtainer v${version} - All valid options"
+	echo "<config>.conf          - Starts a VM with the choosed configuration file."
+	exit 0
 }
 
-function startVM()
+function loadDefaultConfig()
 {
-	echo "QEMU v${qemuVer} - QEMU Script v${qemuScriptVer} - Adapted for QEMU v6.0.0"
-	echo ""
-
-	source "${vmFile}"
-	
-	if [ ! -e "$PWD/VMs" ]; then
-		mkdir "$PWD/VMs"
-	fi
-	vmDisk="$PWD/VMs/${vmName}.qcow2"
-
-	if [ "${XDG_SESSION_TYPE}" == "x11" ]; then
-		vmWidth=$(xrandr --listmonitors | grep -v Monitors | cut -d' ' -f4 | cut -d'/' -f1 | sort | head -n1)
-		vmHeight=$(xrandr --listmonitors | grep -v Monitors | cut -d' ' -f4 | cut -d'/' -f2 | cut -d'x' -f2 | sort | head -n1)
-	fi
-
 	if [ -z ${ram} ]; then
-		ram="1G"
+		ram="2G"
 	fi
 
 	if [ -z ${display} ]; then
-		display="gtk"
+		display="sdl"
 	fi
 
 	if [ -z ${cores} ]; then
-		cores="1"
+		cores="2"
 	fi
 
 	if [ -z ${threads} ]; then
-		threads="1"
+		threads="2"
 	fi
 
 	if [ -z ${cpu} ]; then
@@ -126,8 +60,8 @@ function startVM()
 		optimize_system="linux"
 	fi
 
-	if [ -z ${bios} ]; then
-		bios="efi"
+	if [ -z ${firmware} ]; then
+		firmware="efi"
 	fi
 
 	if [ -z ${nested_virtualization} ]; then
@@ -138,246 +72,179 @@ function startVM()
 		disk_size="40G"
 	fi
 
+	if [ -z ${image_format} ]; then
+		image_format="qcow2"
+	fi
+
+	if [ -z ${cache} ]; then
+		cache="none,aio=native"
+	fi
+
 	if [ -z ${snapshot} ]; then
 		snapshot="off"
 	fi
+}
 
-	if [ -z ${force_add_iso_images} ]; then
-		force_add_iso_images="off"
+function enableNestedVirtualization()
+{
+	if [[ $cpuInfo == *"Intel"* ]]; then
+		nestedIntel=$(cat /sys/module/kvm_intel/parameters/nested)
+		if [ ${nestedIntel} == "N" ] || [ ${nestedIntel} == "0" ]; then
+			sudo modprobe -r kvm_intel
+			sudo modprobe kvm_intel nested=1
+		fi
+		extra="${extra} -device intel-iommu"
+	else
+		nestedAmd=$(cat /sys/module/kvm_amd/parameters/nested)
+		if [ ${nestedAmd} == "N" ] || [ ${nestedAmd} == "0" ]; then
+			sudo modprobe -r kvm_amd
+			sudo modprobe kvm_amd nested=1
+		fi
+		extra="${extra} -device amd-iommu"
+	fi
+}
+
+function disableNestedVirtualization()
+{
+	if [[ $cpuInfo == *"Intel"* ]]; then
+		nestedIntel=$(cat /sys/module/kvm_intel/parameters/nested)
+		if [ ${nestedIntel} == "Y" ] || [ ${nestedIntel} == "1" ]; then
+			sudo modprobe -r kvm_intel
+			sudo modprobe kvm_intel nested=0
+		fi
+	else
+		nestedAmd=$(cat /sys/module/kvm_amd/parameters/nested)
+		if [ ${nestedAmd} == "Y" ] || [ ${nestedAmd} == "1" ]; then
+			sudo modprobe -r kvm_amd
+			sudo modprobe kvm_amd nested=0
+		fi
+	fi
+}
+
+function setupDisk()
+{
+	if [ ${optimize_system} != "macos" ]; then
+		drives="${drives} -drive media=cdrom,index=0,file=${iso}"
+	fi
+}
+
+function start()
+{
+	echo "Virtainer v${version} - Starting VM..."
+
+	# Check if VM configuration file exists
+	if [ ! -e "${name}.conf" ]; then
+		echo "The selected configuration file does not exist!"
+		exit 0
 	fi
 
-	if [ -z ${usb_devices} ]; then
-		usb_devices=()
+	# Create VMs directory if it doesn't exist
+	if [ ! -e ${diskDir} ]; then
+		mkdir ${diskDir}
 	fi
 
+	# Use virtio-vga without VirGL if accelerated graphics are explicitly disabled
+	if [ ${accelerated_graphics} == "off" ]; then
+		graphics="virtio-vga"
+	fi
+
+	# Optimize settings for certain operating systems
 	if [ ${optimize_system} == "linux" ]; then
-		vmSystemGraphics="virtio-vga,virgl=${accelerated_graphics},xres=${vmWidth},yres=${vmHeight}"
-		vmSystemExtra="-device virtio-rng-pci,rng=rng0 -object rng-random,id=rng0,filename=/dev/urandom"
+		extra="-device virtio-rng-pci,rng=rng0 -object rng-random,id=rng0,filename=/dev/urandom"
 	elif [ ${optimize_system} == "windows" ]; then
-		vmSystemGraphics="qxl-vga,vgamem_mb=256,xres=${vmWidth},yres=${vmHeight}"
-		vmCpuTweaks=",hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time"
-		vmSystemExtra="-no-hpet -chardev spiceport,name=org.spice-space.stream.0,id=spicechannel2 -device virtserialport,bus=virtio-serial-bus.0,nr=21,chardev=spicechannel2,name=org.spice-space.stream.0 -chardev spiceport,name=org.spice-space.webdav.0,id=spicechannel3 -device virtserialport,bus=virtio-serial-bus.0,nr=24,chardev=spicechannel3,name=org.spice-space.webdav.0"
-		#vmUsb="usb-ehci"
-		#vmDiskDrive="-device ahci,id=ahci -device ide-hd,drive=drive0,bus=ahci.0"
+		# Create Windows directory if it doesn't exist
+		if [ ! -e ${winDir} ]; then
+			mkdir ${winDir}
+		fi
 
-		display="spice-app"
-	elif [ ${optimize_system} == "legacy" ]; then
-		vmSystemGraphics="cirrus-vga,vgamem_mb=16"
-		vmSystemExtra="-no-hpet"
+		# Download VirtIO guest tools ISO if it doesn't exist
+		if [ ! -f "${winDir}/virtio-win.iso" ]; then
+			wget "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/latest-virtio/virtio-win.iso" -O "${winDir}/virtio-win.iso"
+		fi
 
-		vmUsb="piix4-usb-uhci"
-		vmPeripherals=""
-		
-		vmDiskDrive="-device ide-hd,drive=drive0"
-
-		vmMachine="pc"
-		vmNetwork="pcnet"
-
-		vmAudio="-device AC97"
-
-		bios="legacy"
+		drives="-drive media=cdrom,index=1,file=${winDir}/virtio-win.iso"
+		cpuTweaks=",hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time"
+		extra="-no-hpet"
 	elif [ ${optimize_system} == "macos" ]; then
-		vmCpuTweaks=",vendor=GenuineIntel,+kvm_pv_unhalt,+kvm_pv_eoi,+hypervisor,+invtsc"
+		# SMEP freezes the macOS installer! (Seen on Monterey)
+		cpuTweaks=",vendor=GenuineIntel,+kvm_pv_unhalt,+kvm_pv_eoi,+hypervisor,+invtsc,+movbe,+pcid,+sse3,+ssse3,+sse4.2,+popcnt,+aes,+avx2,+avx,+fma,+bmi1,+bmi2,+xsave,+xsavec,+xsaveopt,+xgetbv1,check"
 
 		if [[ $cpuInfo == *"AMD"* ]]; then
-			cpu="Penryn"
-			vmCpuTweaks="${vmCpuTweaks},+pcid,+ssse3,+sse4.2,+popcnt,+aes,+avx2,+avx,+fma,+fma4,+bmi1,+bmi2,+xsave,+xsaveopt,check"
+			cpuTweaks="${cpuTweaks},+fma4"
 		fi
 
-		vmSystemExtra="-device isa-applesmc,osk=ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc -drive id=drive1,if=none,cache=directsync,aio=native,format=raw,file=$PWD/macOS/OpenCore.iso -device virtio-blk-pci,drive=drive1,scsi=off"
-		vmSystemGraphics="vmware-svga,vgamem_mb=256"
-		vmUsb="usb-ehci"
-		vmNetwork="vmxnet3,mac=52:54:00:c9:18:27"
-
-		if [ ! -e "$PWD/macOS" ]; then
-			mkdir "$PWD/macOS"
+		# pwetty pwease dowont steal owour wowork
+		extra="-device isa-applesmc,osk=ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc"
+		drives="-drive id=drive1,if=none,cache=${cache},format=raw,file=$PWD/macOS/OpenCore.iso -device virtio-blk-pci,drive=drive1,scsi=off -drive id=drive2,if=none,cache=${cache},format=dmg,file=${macDir}/BaseSystem.dmg -device virtio-blk-pci,drive=drive2,scsi=off"
+		
+		if [ ! -e ${macDir} ]; then
+			mkdir ${macDir}
 		fi
 
-		if [ ! -f "$PWD/macOS/OpenCore.iso" ]; then
-			wget "https://github.com/thenickdude/KVM-Opencore/releases/download/v13/OpenCore-v13.iso.gz" -O "$PWD/macOS/OpenCore.iso.gz"
-			gzip -d -f "$PWD/macOS/OpenCore.iso.gz"
-
-			echo ""
+		if [ ! -f "${macDir}/OpenCore.iso" ]; then
+			wget "https://github.com/thenickdude/KVM-Opencore/releases/download/v${openCoreVersion}/OpenCore-v${openCoreVersion}.iso.gz" -O "${macDir}/OpenCore.iso.gz"
+			gzip -d -f "${macDir}/OpenCore.iso.gz"
 		fi
 
-		if [ ! -f "$PWD/macOS/BaseSystem/BaseSystem.dmg" ]; then
-			mkdir "$PWD/macOS/BaseSystem"
+		if [ ! -f "${macDir}/BaseSystem.dmg" ]; then
+			if [ ! -f "${macDir}/fetch.py" ]; then
+				wget "https://raw.githubusercontent.com/kholia/OSX-KVM/master/fetch-macOS-v2.py" -O "${macDir}/fetch.py"
 
-			if [ ! -f "$PWD/macOS/fetch.py" ]; then
-				wget "https://raw.githubusercontent.com/kholia/OSX-KVM/master/fetch-macOS-v2.py" -O "$PWD/macOS/fetch.py"
-
-				${pip} install requests
-				${pip} install click
+				pip3 install requests
+				pip3 install click
 			fi
 
-			${python} "$PWD/macOS/fetch.py" --action download --outdir "$PWD/macOS/BaseSystem" --os-type latest
-			echo ""
+			python3 "${macDir}/fetch.py" --action download -o ${macDir} -os latest
 		fi
 	fi
 
-	if [ ${snapshot} == "on" ]; then
-		vmSystemExtra="${vmSystemExtra} -snapshot"
-	fi
-
+	# Enable nested virtualization if requested
 	if [ ${nested_virtualization} == "on" ]; then
-		echo "WARNING : Enabling nested virtualization might result in degraded performance in the guest machine."
-		echo ""
-
 		enableNestedVirtualization
+	else
+		disableNestedVirtualization
 	fi
 
-	if [ ${bios} == "efi" ]; then
-		vmSystemExtra="${vmSystemExtra} -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/x64/OVMF_CODE.fd -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/x64/OVMF_VARS.fd"
+	# Add snapshot support if requested
+	if [ ${snapshot} == "on" ]; then
+		extra="${extra} -snapshot"
 	fi
 
-	if [ ! -f "${vmDisk}" ]; then
-		${qemuImg} create -q -f qcow2 "${vmDisk}" ${disk_size}		
+	# Use EFI if requested
+	if [ ${firmware} == "efi" ]; then
+		extra="${extra} -drive if=pflash,format=raw,readonly=on,file=${ovmfCode} -drive if=pflash,format=raw,readonly=on,file=${ovmfVars}"
+	fi
+
+	# Setup virtual disk
+	if [ ! -f ${disk} ]; then
+		qemu-img create -q -f ${image_format} ${disk} ${disk_size}		
 		setupDisk
 	else
-		diskSize=$(stat -c%s "${vmDisk}")
-		if [ ${diskSize} -le $((197632 * 8)) ] || [ ${force_add_iso_images} == "on" ]; then
+		diskSize=$(stat -c%s ${disk})
+		if [ ${diskSize} -le $((197632 * 8)) ]; then
 			setupDisk
 		fi
 	fi
 
-	enableUSBPassthrough
-
-	echo "RAM                   : ${ram}"
-	echo "Cores                 : ${cores}"
-	echo "Threads               : ${threads}"
-	echo "CPU                   : ${cpu^}"
-	echo "Accelerated Graphics  : ${accelerated_graphics^^}"
-	echo "Resolution            : ${vmWidth}x${vmHeight}"
-	echo "System optimization   : ${optimize_system^}"
-	echo "Display               : ${display}"
-	echo "BIOS                  : ${bios^}"
-	echo "Nested virtualization : ${nested_virtualization^^}"
-	echo "USB passthrough       : ${usbDevices}"
-	echo "Force adding ISO imgs : ${force_add_iso_images^^}"
-	echo "Disk size             : ${disk_size^^}"
-	echo "Snapshot              : ${snapshot^^}"
-	echo ""
-	echo "Starting..."
-	echo ""
-
-	${qemu} \
-		-name "${vmFile}",process="${vmFile}"  \
-		-enable-kvm -machine ${vmMachine},vmport=off,nvdimm=on \
-		-smbios type=2 \
-		-cpu ${cpu},kvm=on${vmCpuTweaks} -smp sockets=1,cores=${cores},threads=${threads} \
+	# Launch QEMU
+	qemu-system-x86_64 \
+		-name ${name},process=${name}  \
+		-enable-kvm -machine ${machine},nvdimm=on -smbios type=2 \
+		-parallel none -serial none \
+		-cpu ${cpu},kvm=on${cpuTweaks} -smp sockets=1,dies=1,cores=${cores},threads=${threads} \
 		-m ${ram} -device virtio-balloon-pci \
-		-device ${vmSystemGraphics} \
-		-display ${display},gl=${accelerated_graphics} \
-		-device ${vmUsb},id=usb ${vmPeripherals} ${usbPassthrough} \
-		-netdev user,hostname="${vmName}",id=nic -device ${vmNetwork},netdev=nic \
-		${vmAudio} \
+		-device ${graphics} -display ${display},gl=${accelerated_graphics} \
+		-device ${usb},id=usb ${peripherals} \
+		-netdev user,hostname=${name},id=nic -device ${network},netdev=nic \
       	-rtc base=localtime,clock=host \
       	-device virtio-serial-pci \
       	-chardev spicevmc,id=spicechannel0,name=vdagent \
       	-device virtserialport,chardev=spicechannel0,name=com.redhat.spice.0 \
       	-chardev socket,path=/tmp/qga.sock,server=on,wait=off,id=spicechannel1 \
     	-device virtserialport,chardev=spicechannel1,name=org.qemu.guest_agent.0 \
-    	${vmSystemExtra} ${vmSystemDrives} \
-		-drive if=none,id=drive0,cache=directsync,aio=native,format=qcow2,file="${vmDisk}" \
-		${vmDiskDrive} \
+		-drive if=none,id=drive0,discard=unmap,cache=${cache},format=${image_format},file=${disk} \
+		${extra} ${audio} ${drives} ${diskInterface} \
 		"${@}"
-}
-
-function setupDisk()
-{
-	if [ ${optimize_system} == "macos" ]; then
-		vmSystemExtra="${vmSystemExtra} -drive id=drive2,if=none,cache=directsync,aio=native,format=dmg,file=$PWD/macOS/BaseSystem/BaseSystem.dmg -device virtio-blk-pci,drive=drive2,scsi=off"
-	else
-		vmSystemDrives="-drive media=cdrom,index=0,file=${iso}"
-	fi
-
-	if [ ${optimize_system} == "windows" ]; then
-		if [ ! -e "$PWD/Windows" ]; then
-			mkdir "$PWD/Windows"
-		fi
-
-		if [ ! -f "$PWD/Windows/virtio-win.iso" ]; then
-			downloadGuestTools
-		fi
-
-		vmSystemDrives="${vmSystemDrives} -drive media=cdrom,index=1,file=$PWD/Windows/virtio-win.iso"
-	fi
-}
-
-function usage()
-{
-	echo "Virtainer ${qemuScriptVer} - All valid options"
-	echo "-vm <config>.conf          - Starts a VM with the choosed configuration file."
-	echo "-create-shortcut           - Creates a desktop shortcut for the current VM."
-	echo "-delete-shortcut           - Deletes the desktop shortcut of the current VM."
-	exit 0
-}
-
-function downloadGuestTools()
-{
-	wget "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/latest-virtio/virtio-win.iso" -O "$PWD/Windows/virtio-win.iso"
-	echo ""
-}
-
-function enableNestedVirtualization()
-{
-	if [ ${optimize_system} == "windows" ]; then
-		vmCpuTweaks=",hypervisor=off"
-	fi
-
-	if [[ $cpuInfo == *"Intel"* ]]; then
-		nestedIntel=$(cat /sys/module/kvm_intel/parameters/nested)
-		if [ ${nestedIntel} == "N" ] || [ ${nestedIntel} == "0" ]; then
-			echo "Sudo privileges are required to enable nested virtualization."
-			echo ""
-			
-			sudo modprobe -r kvm_intel
-			sudo modprobe kvm_intel nested=1
-		fi
-	else
-		nestedAmd=$(cat /sys/module/kvm_amd/parameters/nested)
-		if [ ${nestedAmd} == "N" ] || [ ${nestedAmd} == "0" ]; then
-			echo "Sudo privileges are required to enable nested virtualization."
-			echo ""
-
-			sudo modprobe -r kvm_amd
-			sudo modprobe kvm_amd nested=1
-		fi
-	fi
-}
-
-function createShortcut()
-{
-	shortcut="/home/${USER}/.local/share/applications/${vmName}.desktop"
-
-	if [ ! -f ${shortcut} ]; then
-		cat << EOF > ${shortcut}
-[Desktop Entry]
-Name=${vmName}
-Comment=Launch ${vmName^} VM
-Exec=${PWD}/${launcher} -vm ${PWD}/${vmFile}
-Terminal=true
-Type=Application
-Version=${qemuScriptVer}
-EOF
-
-		chmod +x ${shortcut}
-		echo "Successfully created a desktop shortcut for the current VM!"
-	else
-		echo "The desktop shortcut of the current VM already exists."
-	fi
-}
-
-function deleteShortcut()
-{
-	shortcut="/home/${USER}/.local/share/applications/${vmName}.desktop"
-
-	if [ -f ${shortcut} ]; then
-		rm ${shortcut}
-		echo "Successfully deleted the desktop shortcut of the current VM!"
-	else
-		echo "The desktop shortcut of the current VM doesn't exist."
-	fi
 }
 
 if [ $# -lt 1 ]; then
@@ -385,22 +252,20 @@ if [ $# -lt 1 ]; then
 else
 	while [ $# -gt 0 ]; do
 		case "${1}" in
-			-vm)
-				launcher=$(basename ${0})
-				vmFile="${2}"
-				vmName=$(basename "${vmFile}" .conf)
+			*)
+				# Load default config
+				source "${2}"
+				loadDefaultConfig
+
+				# Populate some options
+				launcher=$(basename "${0}")
+				name=$(basename "${2}" .conf)
+				disk="${diskDir}/${name}.${image_format}"
+
 				shift
 				shift;;
-			-create-shortcut)
-				createShortcut
-				shift;;
-			-delete-shortcut)
-				deleteShortcut
-				shift;;
-			*)
-				usage;;
 		esac
 	done
 fi
 
-startVM
+start
