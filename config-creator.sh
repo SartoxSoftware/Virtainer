@@ -2,69 +2,71 @@
 
 function start()
 {
-	echo "Welcome to the Virtainer config creator!"
-
-	echo "Name of the guest :"
+	echo "Name:"
 	read name
 
-	echo "Drag & drop the boot ISO :"
-	read iso
+	echo "Boot image:"
+	read boot_image
 
-	echo "How much disk space should the guest have? (format : <number><G,M,K>, default : 40G)"
+	echo "Disk space: (<number><GMK>, default: 40G)"
 	read disk_size
 
-	echo "How much RAM should the guest have? (format : <number><G,M,K>, default : 1G)"
+	echo "RAM: (<number><GMK>, default: 1G)"
 	read ram
 
-	echo "How many cores should the guest have? (default : 1)"
+	echo "Cores: (default: 2)"
 	read cores
 
-	echo "How many threads should the guest have? (default : 1)"
+	echo "Threads: (default: 2)"
 	read threads
 
-	echo "What should be the display UI for the guest? (options : gtk/sdl/spice-app, default : gtk)"
+	echo "QEMU display: (gtk/sdl/spice-app, default: sdl)"
 	read display
 
-	echo "Should the guest have accelerated graphics? (options : on/off, default : on)"
+	echo "Accelerated graphics: (on/off, default: on)"
 	read accelerated_graphics
 
-	echo "What should be the CPU model of the guest? (default : max)"
+	echo "CPU model: (default: max)"
 	read cpu
 
-	echo "Should nested virtualization be enabled in the guest? (options : on/off, default : off)"
+	echo "Nested virtualization: (on/off, default: off)"
 	read nested_virtualization
 
-	echo "For what operating system should the guest be optimized for? (options : linux/windows/macos/legacy, default : linux)"
+	echo "OS optimization: (linux/windows/macos, default: linux)"
 	read optimize_system
 
-	echo "What should be the type of BIOS of the guest? (options : efi/legacy, default : efi)"
-	read bios
+	echo "Firmware: (efi/legacy, default: efi)"
+	read firmware
 
-	echo "Would you like to not save anything to the virtual disk? (options : on/off, default : off)"
+	echo "Secure Boot: (on/off, default: off)"
+	read secure_boot
+
+	echo "Snapshot: (on/off, default: off)"
 	read snapshot
 
-	echo "Would you like to force adding the ISO images (main ISO + driver ISO, if any) even if the OS is installed? (options : on/off, default : off)"
-	read force_add_iso_images
+	echo "Disk cache: (none/unsafe/writethrough/directsync/writeback, default: none)"
+	read cache
 
-	echo "Would you like to passthrough any USB device? (syntax : ('vendorid:productid', 'vendorid2:productid2', ..), default : ())"
-	read usb_devices
+	echo "Disk format: (qcow2/raw/vhd/vdi/vmdk, default: qcow2)"
+	read disk_format
 
 	file="${name}.conf"
 
-	addOptionSafe "${file}" "iso" "${iso}"
-	addOptionSafe "${file}" "disk_size" ${disk_size}
-	addOptionSafe "${file}" "ram" ${ram}
-	addOptionSafe "${file}" "cores" ${cores}
-	addOptionSafe "${file}" "threads" ${threads}
-	addOptionSafe "${file}" "display" ${display}
-	addOptionSafe "${file}" "accelerated_graphics" ${accelerated_graphics}
-	addOptionSafe "${file}" "cpu" ${cpu}
-	addOptionSafe "${file}" "nested_virtualization" ${nested_virtualization}
-	addOptionSafe "${file}" "optimize_system" ${optimize_system}
-	addOptionSafe "${file}" "bios" ${bios}
-	addOptionSafe "${file}" "snapshot" ${snapshot}
-	addOptionSafe "${file}" "force_add_iso_images" ${force_add_iso_images}
-	addOptionSafe "${file}" "usb_devices" ${usb_devices}
+	addOptionSafe ${file} "boot_image" ${boot_image}
+	addOptionSafe ${file} "disk_size" ${disk_size}
+	addOptionSafe ${file} "ram" ${ram}
+	addOptionSafe ${file} "cores" ${cores}
+	addOptionSafe ${file} "threads" ${threads}
+	addOptionSafe ${file} "display" ${display}
+	addOptionSafe ${file} "accelerated_graphics" ${accelerated_graphics}
+	addOptionSafe ${file} "cpu" ${cpu}
+	addOptionSafe ${file} "nested_virtualization" ${nested_virtualization}
+	addOptionSafe ${file} "optimize_system" ${optimize_system}
+	addOptionSafe ${file} "firmware" ${firmware}
+	addOptionSafe ${file} "secure_boot" ${secure_boot}
+	addOptionSafe ${file} "snapshot" ${snapshot}
+	addOptionSafe ${file} "cache" ${cache}
+	addOptionSafe ${file} "disk_format" ${disk_format}
 }
 
 function addOptionSafe()

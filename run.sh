@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 export LC_ALL=C
 
-version="2.0.0"
+version="2.0.1"
 launcher=""
 name=""
 disk=""
-ovmfCode="/usr/share/OVMF/OVMF_CODE.fd"
-ovmfVars="/usr/share/OVMF/OVMF_VARS.fd"
+ovmfPath="/usr/share/OVMF"
+ovmfCode="${ovmfPath}/OVMF_CODE.fd"
+ovmfVars="${ovmfPath}/OVMF_VARS.fd"
 diskDir="$PWD/VMs"
 winDir="$PWD/Windows"
 macDir="$PWD/macOS"
@@ -64,6 +65,10 @@ function loadDefaultConfig()
 		firmware="efi"
 	fi
 
+	if [ -z ${secure_boot} ]; then
+		secure_boot="off"
+	fi
+
 	if [ -z ${nested_virtualization} ]; then
 		nested_virtualization="off"
 	fi
@@ -72,8 +77,8 @@ function loadDefaultConfig()
 		disk_size="40G"
 	fi
 
-	if [ -z ${image_format} ]; then
-		image_format="qcow2"
+	if [ -z ${disk_format} ]; then
+		disk_format="qcow2"
 	fi
 
 	if [ -z ${cache} ]; then
@@ -124,7 +129,7 @@ function disableNestedVirtualization()
 function setupDisk()
 {
 	if [ ${optimize_system} != "macos" ]; then
-		drives="${drives} -drive media=cdrom,index=0,file=${iso}"
+		drives="${drives} -drive media=cdrom,index=0,file=${boot_image}"
 	fi
 }
 
@@ -213,11 +218,17 @@ function start()
 	# Use EFI if requested
 	if [ ${firmware} == "efi" ]; then
 		extra="${extra} -drive if=pflash,format=raw,readonly=on,file=${ovmfCode} -drive if=pflash,format=raw,readonly=on,file=${ovmfVars}"
+
+		# Use Secure Boot if requested
+		if [ ${secure_boot} == "on" ]; then
+			ovmfCode="${ovmfPath}/OVMF_CODE.secboot.fd"
+			ovmfVars="${ovmfPath}/OVMF_VARS.secboot.fd"
+		fi
 	fi
 
 	# Setup virtual disk
 	if [ ! -f ${disk} ]; then
-		qemu-img create -q -f ${image_format} ${disk} ${disk_size}		
+		qemu-img create -q -f ${disk_format} ${disk} ${disk_size}
 		setupDisk
 	else
 		diskSize=$(stat -c%s ${disk})
@@ -242,7 +253,7 @@ function start()
       	-device virtserialport,chardev=spicechannel0,name=com.redhat.spice.0 \
       	-chardev socket,path=/tmp/qga.sock,server=on,wait=off,id=spicechannel1 \
     	-device virtserialport,chardev=spicechannel1,name=org.qemu.guest_agent.0 \
-		-drive if=none,id=drive0,discard=unmap,cache=${cache},format=${image_format},file=${disk} \
+		-drive if=none,id=drive0,discard=unmap,cache=${cache},format=${disk_format},file=${disk} \
 		${extra} ${audio} ${drives} ${diskInterface} \
 		"${@}"
 }
@@ -260,7 +271,7 @@ else
 				# Populate some options
 				launcher=$(basename "${0}")
 				name=$(basename "${2}" .conf)
-				disk="${diskDir}/${name}.${image_format}"
+				disk="${diskDir}/${name}.${disk_format}"
 
 				shift
 				shift;;
