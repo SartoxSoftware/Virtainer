@@ -1,3 +1,6 @@
+# Deprecated
+Check out [ZigEmu](https://github.com/AnErrupTion/ZigEmu) instead.
+
 # Virtainer
 QEMU script supporting Linux, Windows and macOS guests
 
